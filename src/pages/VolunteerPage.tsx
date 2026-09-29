@@ -1,10 +1,11 @@
-import { Users, MapPin, Clock, Phone, Package, KeyRound, AlertTriangle, CheckCircle2, Truck } from 'lucide-react';
+import { Users, MapPin, Clock, Phone, Package, KeyRound, AlertTriangle, CheckCircle2, Truck, Navigation } from 'lucide-react';
 import { useLang } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
 import type { Listing } from '@/types';
 import { foodTypeLabelT, foodTypeColor, statusLabelT, statusColor } from '@/utils/helpers';
 import CountdownTimer from '@/components/CountdownTimer';
+import MapRoute from '@/components/MapRoute';
 
 export default function VolunteerPage() {
   const { t } = useLang();
@@ -127,6 +128,24 @@ export default function VolunteerPage() {
                     <span className="font-mono font-semibold">+91 {task.claimedByNgoPhone}</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Route map */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Navigation className="h-4 w-4 text-teal-600 dark:text-teal-300" />
+                  <span className="text-sm font-bold text-teal-800 dark:text-teal-100">Route: Pickup to Delivery</span>
+                </div>
+                <MapRoute
+                  pickupName={task.donorName}
+                  pickupArea={task.donorArea}
+                  deliverName={task.claimedByNgoName || ''}
+                  deliverArea={task.area}
+                  pickupLat={28.6428}
+                  pickupLon={77.4967}
+                  deliverLat={28.6353}
+                  deliverLon={77.5048}
+                />
               </div>
 
               {/* Handover confirm */}
