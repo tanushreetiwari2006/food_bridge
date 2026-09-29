@@ -60,7 +60,7 @@ export interface Listing {
   donorId: string;
   donorName: string;
   donorArea: string;
-  donorPhone: string;
+  donorPhone?: string;
   foodType: FoodType;
   foodDescription: string;
   quantityPeople: number;
