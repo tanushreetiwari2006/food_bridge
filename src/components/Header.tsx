@@ -5,13 +5,27 @@ import { useNav, type Page } from '@/context/NavContext';
 import { useLang, type Language } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 
-const navItems: { labelKey: string; page: Page }[] = [
+const allNavItems: { labelKey: string; page: Page }[] = [
   { labelKey: 'nav_home', page: 'home' },
   { labelKey: 'nav_board', page: 'board' },
   { labelKey: 'nav_donor', page: 'donor' },
   { labelKey: 'nav_ngo', page: 'ngo' },
+  { labelKey: 'nav_volunteer', page: 'volunteer' },
   { labelKey: 'nav_admin', page: 'admin' },
 ];
+
+function getNavItems(role: string | undefined): { labelKey: string; page: Page }[] {
+  const common = [
+    { labelKey: 'nav_home', page: 'home' as Page },
+    { labelKey: 'nav_board', page: 'board' as Page },
+  ];
+  if (!role) return [...common, ...allNavItems.filter((i) => i.page === 'donor' || i.page === 'ngo')];
+  if (role === 'donor') return [...common, { labelKey: 'nav_donor', page: 'donor' as Page }, { labelKey: 'nav_volunteer', page: 'volunteer' as Page }];
+  if (role === 'ngo') return [...common, { labelKey: 'nav_ngo', page: 'ngo' as Page }];
+  if (role === 'volunteer') return [...common, { labelKey: 'nav_volunteer', page: 'volunteer' as Page }];
+  if (role === 'admin') return [...common, { labelKey: 'nav_admin', page: 'admin' as Page }];
+  return common;
+}
 
 export default function Header() {
   const { theme, toggleTheme } = useTheme();
@@ -19,6 +33,8 @@ export default function Header() {
   const { lang, setLang, t } = useLang();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const navItems = getNavItems(user?.role);
 
   const handleLogout = () => {
     logout();

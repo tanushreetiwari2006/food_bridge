@@ -1,18 +1,25 @@
 import { useState } from 'react';
-import { Sparkles, Mic, Send, CheckCircle2, KeyRound, AlertTriangle, Users, MapPin, Clock, Truck, Loader2, TrendingUp } from 'lucide-react';
+import { Sparkles, Mic, Send, CheckCircle2, KeyRound, AlertTriangle, Users, MapPin, Clock, Truck, Loader2, TrendingUp, UserPlus, Trash2, Phone } from 'lucide-react';
 import type { Listing, FoodType, PickupMethod } from '@/types';
 import { mockListings, mockDonors } from '@/data/mockData';
 import { foodTypeLabelT, foodTypeColor, statusLabelT, statusColor } from '@/utils/helpers';
 import { useLang } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import CountdownTimer from '@/components/CountdownTimer';
 
 export default function DonorPage() {
   const { t } = useLang();
+  const { helpers, addHelper, removeHelper } = useAuth();
   const [listings, setListings] = useState<Listing[]>(mockListings.filter((l) => l.donorId === 'd1'));
   const [quickText, setQuickText] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const [showCodeFor, setShowCodeFor] = useState<string | null>(null);
+
+  const [helperName, setHelperName] = useState('');
+  const [helperPhone, setHelperPhone] = useState('');
+  const [helperError, setHelperError] = useState('');
+  const [helperSuccess, setHelperSuccess] = useState('');
 
   const [foodType, setFoodType] = useState<FoodType>('veg');
   const [foodDescription, setFoodDescription] = useState('');
@@ -115,6 +122,23 @@ export default function DonorPage() {
   };
 
   const foodTypes: FoodType[] = ['veg', 'non-veg', 'dry'];
+
+  const myHelpers = helpers.filter((h) => h.ownerRole === 'donor');
+
+  const handleAddHelper = (e: React.FormEvent) => {
+    e.preventDefault();
+    setHelperError('');
+    setHelperSuccess('');
+    if (!helperName.trim() || helperPhone.replace(/\D/g, '').length !== 10) {
+      setHelperError(t('login_invalid_phone'));
+      return;
+    }
+    addHelper(helperName.trim(), helperPhone.replace(/\D/g, ''));
+    setHelperSuccess(t('team_helper_added'));
+    setHelperName('');
+    setHelperPhone('');
+    setTimeout(() => setHelperSuccess(''), 3000);
+  };
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
@@ -297,6 +321,62 @@ export default function DonorPage() {
           </button>
         </form>
       )}
+
+      {/* My Team / Helpers */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-800 text-teal-700 dark:text-teal-200">
+            <UserPlus className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="font-display text-xl font-bold text-teal-900 dark:text-teal-50">{t('team_title')}</h2>
+            <p className="text-xs text-teal-500 dark:text-teal-400">{t('team_sub')}</p>
+          </div>
+        </div>
+        <div className="card">
+          <form onSubmit={handleAddHelper} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 mb-4">
+            <div>
+              <input type="text" value={helperName} onChange={(e) => setHelperName(e.target.value)} placeholder={t('team_helper_name')} className="input-field" />
+            </div>
+            <div className="relative">
+              <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-teal-400" />
+              <input type="tel" value={helperPhone} onChange={(e) => setHelperPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder={t('team_helper_phone')} className="input-field pl-11" />
+            </div>
+            <button type="submit" className="btn-primary whitespace-nowrap">
+              <UserPlus className="h-5 w-5" /> {t('team_add')}
+            </button>
+          </form>
+          {helperError && <p className="text-sm text-error-600 dark:text-error-400 mb-3">{helperError}</p>}
+          {helperSuccess && (
+            <div className="rounded-xl bg-success-100 dark:bg-success-900/30 border border-success-200 dark:border-success-800 px-4 py-2.5 mb-3 flex items-center gap-2 animate-slide-up">
+              <CheckCircle2 className="h-4 w-4 text-success-600 dark:text-success-500" />
+              <p className="text-sm font-medium text-success-700 dark:text-success-400">{helperSuccess}</p>
+            </div>
+          )}
+          {myHelpers.length === 0 ? (
+            <p className="text-sm text-teal-500 dark:text-teal-400 text-center py-4">{t('team_no_helpers')}</p>
+          ) : (
+            <div className="space-y-2">
+              {myHelpers.map((h) => (
+                <div key={h.id} className="flex items-center justify-between rounded-xl bg-cream-100 dark:bg-teal-900/40 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-200 dark:bg-teal-700 text-teal-700 dark:text-teal-200">
+                      <Users className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-teal-900 dark:text-teal-50 text-sm">{h.name}</p>
+                      <p className="text-xs text-teal-500 dark:text-teal-400">+91 {h.phone}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => removeHelper(h.id)} className="text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-900/20 rounded-lg p-2 transition-all">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* My listings */}
       <div>

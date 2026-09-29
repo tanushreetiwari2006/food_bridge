@@ -30,7 +30,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const [helpers, setHelpers] = useState<Helper[]>(() => {
     const saved = localStorage.getItem(HELPERS_KEY);
-    return saved ? JSON.parse(saved) : [];
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: 'h-demo',
+        name: 'Ramesh',
+        phone: '9876501234',
+        ownerId: 'd1',
+        ownerName: 'Sharma Caterers',
+        ownerRole: 'donor',
+      },
+    ];
   });
 
   const login = (newUser: AuthUser) => {

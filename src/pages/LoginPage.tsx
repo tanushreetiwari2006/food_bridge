@@ -9,7 +9,7 @@ type Step = 'role' | 'phone' | 'otp' | 'verify' | 'admin';
 
 export default function LoginPage() {
   const { t } = useLang();
-  const { login, setPendingRole, setPendingPhone, pendingRole, pendingPhone, isRegisteredHelper } = useAuth();
+  const { login, setPendingRole, setPendingPhone, pendingRole, pendingPhone, isRegisteredHelper, helpers } = useAuth();
   const { navigate } = useNav();
 
   const [step, setStep] = useState<Step>('role');
@@ -110,11 +110,12 @@ export default function LoginPage() {
 
     // Volunteer: no verification step needed, find helper info
     if (pendingRole === 'volunteer') {
+      const helperRecord = helpers.find((h) => h.phone === (pendingPhone || phone));
       const volunteerUser: AuthUser = {
         id: `vol-${pendingPhone}`,
         phone: pendingPhone || phone,
         role: 'volunteer',
-        name: 'Volunteer',
+        name: helperRecord?.name || 'Volunteer',
         area: '',
         verified: true,
         joinedAt: new Date().toISOString(),
