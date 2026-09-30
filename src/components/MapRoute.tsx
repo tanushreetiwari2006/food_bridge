@@ -1,4 +1,4 @@
-import { MapPin, Package, Navigation, Clock, Milestone } from 'lucide-react';
+import { MapPin, Package, Navigation, Clock, Milestone, ExternalLink } from 'lucide-react';
 import { useLang } from '@/context/LanguageContext';
 
 interface Props {
@@ -15,18 +15,24 @@ interface Props {
 export default function MapRoute({ pickupName, pickupArea, deliverName, deliverArea, pickupLat, pickupLon, deliverLat, deliverLon }: Props) {
   const { t } = useLang();
 
-  const minLat = Math.min(pickupLat, deliverLat) - 0.003;
-  const maxLat = Math.max(pickupLat, deliverLat) + 0.003;
-  const minLon = Math.min(pickupLon, deliverLon) - 0.003;
-  const maxLon = Math.max(pickupLon, deliverLon) + 0.003;
+  const padLat = 0.004;
+  const padLon = 0.006;
+  const minLat = Math.min(pickupLat, deliverLat) - padLat;
+  const maxLat = Math.max(pickupLat, deliverLat) + padLat;
+  const minLon = Math.min(pickupLon, deliverLon) - padLon;
+  const maxLon = Math.max(pickupLon, deliverLon) + padLon;
 
   const bbox = `${minLon},${minLat},${maxLon},${maxLat}`;
-  const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik`;
+  const iframeUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${pickupLat},${pickupLon}`;
+  const fullMapUrl = `https://www.openstreetmap.org/directions?from=${pickupLat},${pickupLon}&to=${deliverLat},${deliverLon}`;
 
-  const pickupX = ((pickupLon - minLon) / (maxLon - minLon)) * 100;
-  const pickupY = ((maxLat - pickupLat) / (maxLat - minLat)) * 100;
-  const deliverX = ((deliverLon - minLon) / (maxLon - minLon)) * 100;
-  const deliverY = ((maxLat - deliverLat) / (maxLat - minLat)) * 100;
+  const rangeLon = maxLon - minLon;
+  const rangeLat = maxLat - minLat;
+
+  const pickupX = ((pickupLon - minLon) / rangeLon) * 100;
+  const pickupY = ((maxLat - pickupLat) / rangeLat) * 100;
+  const deliverX = ((deliverLon - minLon) / rangeLon) * 100;
+  const deliverY = ((maxLat - deliverLat) / rangeLat) * 100;
 
   const distance = Math.round(Math.sqrt(Math.pow((deliverLat - pickupLat) * 111, 2) + Math.pow((deliverLon - pickupLon) * 111, 2)) * 10) / 10;
   const etaMin = Math.max(5, Math.round(distance * 3));
@@ -39,32 +45,36 @@ export default function MapRoute({ pickupName, pickupArea, deliverName, deliverA
         <div className="ml-auto flex items-center gap-3 text-xs font-semibold text-teal-600 dark:text-teal-300">
           <span className="flex items-center gap-1"><Milestone className="h-3.5 w-3.5" /> {distance} km</span>
           <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> ~{etaMin} min</span>
+          <a href={fullMapUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-teal-500 hover:text-teal-700 dark:hover:text-teal-200 transition-colors">
+            <ExternalLink className="h-3.5 w-3.5" /> Open
+          </a>
         </div>
       </div>
 
-      <div className="relative w-full" style={{ height: '280px' }}>
+      <div className="relative w-full bg-teal-100 dark:bg-teal-800" style={{ height: '300px' }}>
         <iframe
-          src={mapUrl}
+          src={iframeUrl}
           className="absolute inset-0 w-full h-full border-0"
           loading="lazy"
           title="Route map"
         />
 
         <div className="absolute inset-0 pointer-events-none">
-          <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+          <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100" style={{ overflow: 'visible' }}>
             <defs>
-              <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-                <polygon points="0 0, 6 3, 0 6" fill="#f59e0b" />
+              <marker id="arrowhead" markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" orient="auto">
+                <polygon points="0 0, 5 2.5, 0 5" fill="#f59e0b" />
               </marker>
             </defs>
             <line
               x1={pickupX} y1={pickupY}
               x2={deliverX} y2={deliverY}
               stroke="#f59e0b"
-              strokeWidth="0.8"
-              strokeDasharray="2,1.5"
+              strokeWidth="0.6"
+              strokeDasharray="2,1.2"
               strokeLinecap="round"
               markerEnd="url(#arrowhead)"
+              opacity="0.9"
             />
           </svg>
 
@@ -73,10 +83,10 @@ export default function MapRoute({ pickupName, pickupArea, deliverName, deliverA
             style={{ left: `${pickupX}%`, top: `${pickupY}%` }}
           >
             <div className="flex flex-col items-center">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg ring-2 ring-white dark:ring-teal-900">
-                <MapPin className="h-4 w-4" fill="white" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg ring-2 ring-white dark:ring-teal-900">
+                <MapPin className="h-5 w-5" fill="white" />
               </div>
-              <div className="mt-0.5 rounded-md bg-white/95 dark:bg-teal-800/95 px-2 py-0.5 text-[10px] font-bold text-teal-800 dark:text-teal-100 shadow whitespace-nowrap">
+              <div className="mt-1 rounded-md bg-white/95 dark:bg-teal-800/95 px-2 py-0.5 text-[10px] font-bold text-teal-800 dark:text-teal-100 shadow whitespace-nowrap">
                 {t('volunteer_pickup_from')}
               </div>
             </div>
@@ -87,10 +97,10 @@ export default function MapRoute({ pickupName, pickupArea, deliverName, deliverA
             style={{ left: `${deliverX}%`, top: `${deliverY}%` }}
           >
             <div className="flex flex-col items-center">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white shadow-lg ring-2 ring-white dark:ring-teal-900">
-                <Package className="h-4 w-4" fill="white" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-white shadow-lg ring-2 ring-white dark:ring-teal-900">
+                <Package className="h-5 w-5" fill="white" />
               </div>
-              <div className="mt-0.5 rounded-md bg-white/95 dark:bg-teal-800/95 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300 shadow whitespace-nowrap">
+              <div className="mt-1 rounded-md bg-white/95 dark:bg-teal-800/95 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300 shadow whitespace-nowrap">
                 {t('volunteer_deliver_to')}
               </div>
             </div>

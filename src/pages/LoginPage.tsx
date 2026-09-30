@@ -189,10 +189,10 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           <button
             onClick={handleLogoClick}
-            className="inline-flex h-16 w-16 rounded-2xl shadow-lg mb-3 focus-visible:outline-none overflow-hidden"
+            className="inline-flex h-16 w-auto rounded-2xl shadow-lg mb-3 focus-visible:outline-none overflow-hidden"
             aria-label="Food Bridge logo"
           >
-            <img src="/ChatGPT_Image_Sep_30,_2026,_09_08_03_AM.png" alt="Food Bridge" className="h-full w-full object-cover" />
+            <img src="/ChatGPT_Image_Sep_30,_2026,_09_08_03_AM.png" alt="Food Bridge" className="h-16 w-auto object-contain" />
           </button>
           <h1 className="font-display text-2xl font-bold text-teal-900 dark:text-teal-50">Food Bridge</h1>
           <p className="text-sm text-teal-500 dark:text-teal-400">{t('brand_tagline')}</p>
