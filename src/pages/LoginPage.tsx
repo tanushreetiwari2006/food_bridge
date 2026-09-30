@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Heart, ArrowRight, ArrowLeft, Phone, KeyRound, ShieldCheck, Building2, Users, Truck, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Phone, KeyRound, ShieldCheck, Building2, Users, Truck, CheckCircle2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLang } from '@/context/LanguageContext';
 import { useNav } from '@/context/NavContext';
@@ -28,7 +28,7 @@ export default function LoginPage() {
   const [regNumber, setRegNumber] = useState('');
   const [verifyError, setVerifyError] = useState('');
 
-  const roles: { role: Role; icon: typeof Heart; labelKey: string; descKey: string }[] = [
+  const roles: { role: Role; icon: typeof Truck; labelKey: string; descKey: string }[] = [
     { role: 'donor', icon: Building2, labelKey: 'login_donor', descKey: 'login_donor_desc' },
     { role: 'ngo', icon: Users, labelKey: 'login_ngo', descKey: 'login_ngo_desc' },
     { role: 'volunteer', icon: Truck, labelKey: 'login_volunteer', descKey: 'login_volunteer_desc' },
@@ -189,10 +189,10 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           <button
             onClick={handleLogoClick}
-            className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-700 text-white shadow-lg mb-3 focus-visible:outline-none"
+            className="inline-flex h-16 w-16 rounded-2xl shadow-lg mb-3 focus-visible:outline-none overflow-hidden"
             aria-label="Food Bridge logo"
           >
-            <Heart className="h-7 w-7" fill="white" />
+            <img src="/ChatGPT_Image_Sep_30,_2026,_09_08_03_AM.png" alt="Food Bridge" className="h-full w-full object-cover" />
           </button>
           <h1 className="font-display text-2xl font-bold text-teal-900 dark:text-teal-50">Food Bridge</h1>
           <p className="text-sm text-teal-500 dark:text-teal-400">{t('brand_tagline')}</p>

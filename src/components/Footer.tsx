@@ -1,4 +1,4 @@
-import { Heart, Phone, Mail, MapPin } from 'lucide-react';
+import { Phone, Mail, MapPin } from 'lucide-react';
 import { useLang } from '@/context/LanguageContext';
 
 export default function Footer() {
@@ -10,9 +10,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-2">
             <div className="flex items-center gap-2.5 mb-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-700 text-white">
-                <Heart className="h-5 w-5" fill="white" />
-              </div>
+              <img src="/ChatGPT_Image_Sep_30,_2026,_09_08_03_AM.png" alt="Food Bridge" className="h-11 w-11 rounded-xl object-cover" />
               <span className="font-display text-lg font-bold text-teal-800 dark:text-teal-100">Food Bridge</span>
             </div>
             <p className="text-sm text-teal-600 dark:text-teal-300 max-w-md leading-relaxed">

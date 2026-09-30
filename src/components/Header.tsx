@@ -1,4 +1,4 @@
-import { Heart, Sun, Moon, Menu, X, LogIn, LogOut, User } from 'lucide-react';
+import { Sun, Moon, Menu, X, LogIn, LogOut, User } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { useNav, type Page } from '@/context/NavContext';
@@ -50,9 +50,7 @@ export default function Header() {
           onClick={() => navigate('home')}
           className="flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 rounded-lg"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-700 text-white shadow-sm">
-            <Heart className="h-5 w-5" fill="white" />
-          </div>
+          <img src="/ChatGPT_Image_Sep_30,_2026,_09_08_03_AM.png" alt="Food Bridge" className="h-11 w-11 rounded-xl object-cover shadow-sm" />
           <div className="text-left">
             <span className="font-display text-lg font-bold text-teal-800 dark:text-teal-100">Food Bridge</span>
             <span className="hidden sm:block text-xs text-teal-500 dark:text-teal-400 -mt-0.5">{t('brand_tagline')}</span>
