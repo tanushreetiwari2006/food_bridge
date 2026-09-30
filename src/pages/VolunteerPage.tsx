@@ -137,14 +137,23 @@ export default function VolunteerPage() {
                   <span className="text-sm font-bold text-teal-800 dark:text-teal-100">Route: Pickup to Delivery</span>
                 </div>
                 <MapRoute
-                  pickupName={task.donorName}
-                  pickupArea={task.donorArea}
-                  deliverName={task.claimedByNgoName || ''}
-                  deliverArea={task.area}
-                  pickupLat={28.6428}
-                  pickupLon={77.4967}
-                  deliverLat={28.6353}
-                  deliverLon={77.5048}
+                  pickup={{
+                    name: task.donorName,
+                    area: task.donorArea,
+                    lat: 28.6428,
+                    lon: 77.4967,
+                    phone: task.donorPhone,
+                  }}
+                  delivery={{
+                    name: task.claimedByNgoName || 'NGO',
+                    area: task.area,
+                    lat: 28.6353,
+                    lon: 77.5048,
+                    phone: task.claimedByNgoPhone,
+                  }}
+                  helperId={user?.phone || 'helper-demo'}
+                  helperName={myHelperRecord?.name || user?.name || 'Volunteer'}
+                  taskId={task.id}
                 />
               </div>
 
