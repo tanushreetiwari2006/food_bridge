@@ -1,10 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import { Navigation, Clock, Milestone, ExternalLink, Crosshair, Loader2, WifiOff } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Clock, Crosshair, ExternalLink, Loader2, MapPin, Milestone, Navigation, Package, Truck } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 import { useLang } from '@/context/LanguageContext';
-import { supabase } from '@/lib/supabase';
 
 export interface MapLocation {
   name: string;
@@ -17,195 +14,133 @@ export interface MapLocation {
 interface Props {
   pickup: MapLocation;
   delivery: MapLocation;
-  helperId: string;
   helperName: string;
-  taskId: string;
 }
 
-function createDivIcon(html: string, className: string) {
-  return L.divIcon({
-    html,
-    className,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -18],
-  });
+type MarkerKey = 'pickup' | 'delivery' | 'helper' | null;
+type GeoStatus = 'idle' | 'requesting' | 'granted' | 'denied' | 'demo';
+type Point = [number, number];
+
+function distanceBetween(first: MapLocation, second: MapLocation): number {
+  const latitudeDistance = (second.lat - first.lat) * 111;
+  const longitudeDistance = (second.lon - first.lon) * 111 * Math.cos((first.lat * Math.PI) / 180);
+  return Math.sqrt(latitudeDistance ** 2 + longitudeDistance ** 2);
 }
 
-const pickupIcon = createDivIcon(
-  '<div style="background:#0f766e;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:16px">📍</div>',
-  'pickup-marker'
-);
-
-const deliveryIcon = createDivIcon(
-  '<div style="background:#f59e0b;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:16px">📦</div>',
-  'delivery-marker'
-);
-
-const helperIcon = createDivIcon(
-  '<div style="background:#2563eb;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:16px">🚚</div>',
-  'helper-marker'
-);
-
-const helperIconPulse = createDivIcon(
-  '<div style="position:relative;width:32px;height:32px"><div style="position:absolute;inset:0;background:#2563eb;border-radius:50%;opacity:0.4;animation:pulse-ring 2s ease-out infinite"></div><div style="position:absolute;inset:0;background:#2563eb;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:16px">🚚</div></div>',
-  'helper-marker-pulse'
-);
-
-function FitBounds({ pickup, delivery, helperPos }: { pickup: MapLocation; delivery: MapLocation; helperPos: [number, number] | null }) {
-  const map = useMap();
-  useEffect(() => {
-    const points: [number, number][] = [
-      [pickup.lat, pickup.lon],
-      [delivery.lat, delivery.lon],
-    ];
-    if (helperPos) points.push(helperPos);
-    const bounds = L.latLngBounds(points);
-    map.fitBounds(bounds, { padding: [50, 50] });
-  }, [map, pickup, delivery, helperPos]);
-  return null;
+function positionBetween(first: MapLocation, second: MapLocation, progress: number): Point {
+  return [
+    first.lat + (second.lat - first.lat) * progress,
+    first.lon + (second.lon - first.lon) * progress,
+  ];
 }
 
-function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-export default function MapRoute({ pickup, delivery, helperId, helperName, taskId }: Props) {
+export default function MapRoute({ pickup, delivery, helperName }: Props) {
   const { theme } = useTheme();
   const { t } = useLang();
-
-  const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
-  const [routeLoading, setRouteLoading] = useState(true);
-  const [routeError, setRouteError] = useState(false);
-  const [helperPos, setHelperPos] = useState<[number, number] | null>(null);
-  const [helperUpdatedAt, setHelperUpdatedAt] = useState<string | null>(null);
-  const [liveConnected, setLiveConnected] = useState(false);
-  const [geoStatus, setGeoStatus] = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
+  const [activeMarker, setActiveMarker] = useState<MarkerKey>(null);
+  const [helperPos, setHelperPos] = useState<Point>(() => positionBetween(pickup, delivery, 0.42));
+  const [helperUpdatedAt, setHelperUpdatedAt] = useState<Date | null>(null);
+  const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle');
   const watchIdRef = useRef<number | null>(null);
+  const simulationRef = useRef<number | null>(null);
 
-  const distance = routeCoords.length > 0
-    ? routeCoords.reduce((acc, c, i) => (i === 0 ? 0 : acc + haversine(routeCoords[i - 1][0], routeCoords[i - 1][1], c[0], c[1])), 0)
-    : haversine(pickup.lat, pickup.lon, delivery.lat, delivery.lon);
-  const distanceKm = Math.round(distance * 10) / 10;
+  const routePoints = useMemo<Point[]>(() => {
+    const midpoint = positionBetween(pickup, delivery, 0.5);
+    const latitudeOffset = Math.abs(delivery.lon - pickup.lon) * 0.2;
+    return [
+      [pickup.lat, pickup.lon],
+      positionBetween(pickup, delivery, 0.22),
+      [midpoint[0] + latitudeOffset, midpoint[1]],
+      positionBetween(pickup, delivery, 0.78),
+      [delivery.lat, delivery.lon],
+    ];
+  }, [delivery, pickup]);
+
+  const bounds = useMemo(() => {
+    const points = [
+      [pickup.lat, pickup.lon],
+      [delivery.lat, delivery.lon],
+      ...routePoints,
+    ];
+    const latitudes = points.map(([lat]) => lat);
+    const longitudes = points.map(([, lon]) => lon);
+    return {
+      minLat: Math.min(...latitudes) - 0.001,
+      maxLat: Math.max(...latitudes) + 0.001,
+      minLon: Math.min(...longitudes) - 0.001,
+      maxLon: Math.max(...longitudes) + 0.001,
+    };
+  }, [delivery, pickup, routePoints]);
+
+  const toPercent = useCallback((point: Point): Point => {
+    const x = ((point[1] - bounds.minLon) / (bounds.maxLon - bounds.minLon)) * 100;
+    const y = ((bounds.maxLat - point[0]) / (bounds.maxLat - bounds.minLat)) * 100;
+    return [x, y];
+  }, [bounds]);
+
+  const routePercentages = routePoints.map(toPercent);
+  const pickupPosition = toPercent([pickup.lat, pickup.lon]);
+  const deliveryPosition = toPercent([delivery.lat, delivery.lon]);
+  const helperPosition = toPercent(helperPos);
+  const distanceKm = Math.round(distanceBetween(pickup, delivery) * 10) / 10;
   const etaMin = Math.max(5, Math.round(distanceKm * 3));
+  const routePath = routePercentages.map(([x, y]) => `${x},${y}`).join(' ');
 
-  // Fetch OSRM route
-  useEffect(() => {
-    setRouteLoading(true);
-    setRouteError(false);
-    const url = `https://router.project-osrm.org/route/v1/driving/${pickup.lon},${pickup.lat};${delivery.lon},${delivery.lat}?overview=full&geometries=geojson`;
-    fetch(url)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.routes && data.routes[0]) {
-          const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
-            (c: [number, number]) => [c[1], c[0]]
-          );
-          setRouteCoords(coords);
-        } else {
-          setRouteError(true);
-        }
-      })
-      .catch(() => setRouteError(true))
-      .finally(() => setRouteLoading(false));
-  }, [pickup, delivery]);
-
-  // Subscribe to helper live position via Supabase Realtime
-  useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-
-    (async () => {
-      // Try to load existing position
-      const { data } = await supabase
-        .from('helper_locations')
-        .select('*')
-        .eq('id', helperId)
-        .maybeSingle();
-
-      if (data) {
-        setHelperPos([data.lat, data.lon]);
-        setHelperUpdatedAt(data.updated_at);
-      }
-
-      channel = supabase
-        .channel(`helper-location-${helperId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'helper_locations',
-            filter: `id=eq.${helperId}`,
-          },
-          (payload) => {
-            const row = payload.new as { lat: number; lon: number; updated_at: string } | null;
-            if (row) {
-              setHelperPos([row.lat, row.lon]);
-              setHelperUpdatedAt(row.updated_at);
-              setLiveConnected(true);
-            }
-          }
-        )
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') setLiveConnected(true);
-        });
-    })();
-
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [helperId]);
-
-  // Request browser geolocation and start uploading position
-  const requestGeolocation = useCallback(() => {
-    if (!('geolocation' in navigator)) {
-      setGeoStatus('denied');
-      return;
+  const stopTracking = useCallback(() => {
+    if (watchIdRef.current !== null && 'geolocation' in navigator) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
     }
-    setGeoStatus('requesting');
-
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      async (pos) => {
-        setGeoStatus('granted');
-        const { latitude, longitude, heading } = pos.coords;
-        setHelperPos([latitude, longitude]);
-
-        await supabase
-          .from('helper_locations')
-          .upsert({
-            id: helperId,
-            helper_name: helperName,
-            task_id: taskId,
-            lat: latitude,
-            lon: longitude,
-            heading: heading ?? 0,
-            updated_at: new Date().toISOString(),
-          });
-      },
-      () => setGeoStatus('denied'),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-    );
-  }, [helperId, helperName, taskId]);
-
-  useEffect(() => {
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-    };
+    if (simulationRef.current !== null) {
+      window.clearInterval(simulationRef.current);
+      simulationRef.current = null;
+    }
   }, []);
 
-  const fullMapUrl = `https://www.openstreetmap.org/directions?from=${pickup.lat},${pickup.lon}&to=${delivery.lat},${delivery.lon}`;
+  const startDemoTracking = useCallback(() => {
+    let progress = 0.42;
+    setGeoStatus('demo');
+    setHelperPos(positionBetween(pickup, delivery, progress));
+    setHelperUpdatedAt(new Date());
+    simulationRef.current = window.setInterval(() => {
+      progress = progress >= 0.9 ? 0.18 : progress + 0.03;
+      setHelperPos(positionBetween(pickup, delivery, progress));
+      setHelperUpdatedAt(new Date());
+    }, 2500);
+  }, [delivery, pickup]);
 
-  const tileUrlLight = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const tileUrlDark = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-  const tileUrl = theme === 'dark' ? tileUrlDark : tileUrlLight;
+  const requestGeolocation = useCallback(() => {
+    stopTracking();
+    if (!('geolocation' in navigator)) {
+      startDemoTracking();
+      return;
+    }
+
+    setGeoStatus('requesting');
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        setGeoStatus('granted');
+        setHelperPos([position.coords.latitude, position.coords.longitude]);
+        setHelperUpdatedAt(new Date());
+      },
+      () => startDemoTracking(),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    );
+  }, [startDemoTracking, stopTracking]);
+
+  useEffect(() => stopTracking, [stopTracking]);
+
+  const markerButton = (marker: MarkerKey, position: Point, className: string, label: string, icon: ReactNode) => (
+    <button
+      type="button"
+      onClick={() => setActiveMarker(activeMarker === marker ? null : marker)}
+      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-lg transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${className}`}
+      style={{ left: `${position[0]}%`, top: `${position[1]}%` }}
+      aria-label={label}
+    >
+      <span className="flex h-9 w-9 items-center justify-center text-white">{icon}</span>
+    </button>
+  );
 
   return (
     <div className="rounded-2xl border border-cream-300 dark:border-teal-800 bg-white dark:bg-teal-900 shadow-sm overflow-hidden">
@@ -215,144 +150,82 @@ export default function MapRoute({ pickup, delivery, helperId, helperName, taskI
         <div className="ml-auto flex items-center gap-3 text-xs font-semibold text-teal-600 dark:text-teal-300">
           <span className="flex items-center gap-1"><Milestone className="h-3.5 w-3.5" /> {distanceKm} km</span>
           <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> ~{etaMin} min</span>
-          <a href={fullMapUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-teal-500 hover:text-teal-700 dark:hover:text-teal-200 transition-colors">
-            <ExternalLink className="h-3.5 w-3.5" /> Open
-          </a>
+          <span className="hidden sm:flex items-center gap-1 text-teal-400"><ExternalLink className="h-3.5 w-3.5" /> Demo route</span>
         </div>
       </div>
 
-      {/* Live status bar */}
       <div className="flex items-center gap-3 px-4 py-2 bg-teal-50 dark:bg-teal-800/50 border-b border-cream-200 dark:border-teal-800 text-xs">
-        <div className="flex items-center gap-1.5">
-          {liveConnected ? (
-            <span className="flex items-center gap-1 text-success-600 dark:text-success-400 font-semibold">
-              <span className="h-2 w-2 rounded-full bg-success-500 animate-pulse" /> Live tracking on
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-teal-500 dark:text-teal-400">
-              <WifiOff className="h-3.5 w-3.5" /> Connecting…
-            </span>
-          )}
-        </div>
-        {helperUpdatedAt && (
-          <span className="text-teal-400 dark:text-teal-500">
-            Updated {new Date(helperUpdatedAt).toLocaleTimeString()}
-          </span>
-        )}
+        <span className="flex items-center gap-1.5 text-success-600 dark:text-success-400 font-semibold">
+          <span className="h-2 w-2 rounded-full bg-success-500 animate-pulse" /> Local tracking ready
+        </span>
+        {helperUpdatedAt && <span className="text-teal-400 dark:text-teal-500">Updated {helperUpdatedAt.toLocaleTimeString()}</span>}
         <div className="ml-auto">
           {geoStatus === 'idle' && (
             <button onClick={requestGeolocation} className="flex items-center gap-1 text-teal-600 dark:text-teal-300 font-semibold hover:text-teal-800 dark:hover:text-teal-100 transition-colors">
               <Crosshair className="h-3.5 w-3.5" /> Share my location
             </button>
           )}
-          {geoStatus === 'requesting' && (
-            <span className="flex items-center gap-1 text-teal-500 dark:text-teal-400">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Requesting…
-            </span>
-          )}
-          {geoStatus === 'granted' && (
-            <span className="flex items-center gap-1 text-success-600 dark:text-success-400 font-semibold">
-              <Crosshair className="h-3.5 w-3.5" /> Location shared
-            </span>
-          )}
-          {geoStatus === 'denied' && (
-            <span className="text-error-500 dark:text-error-400">Location permission denied</span>
-          )}
+          {geoStatus === 'requesting' && <span className="flex items-center gap-1 text-teal-500"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Requesting…</span>}
+          {geoStatus === 'granted' && <span className="flex items-center gap-1 text-success-600 dark:text-success-400 font-semibold"><Crosshair className="h-3.5 w-3.5" /> Location shown locally</span>}
+          {geoStatus === 'demo' && <span className="flex items-center gap-1 text-teal-600 dark:text-teal-300 font-semibold"><Truck className="h-3.5 w-3.5" /> Demo movement active</span>}
         </div>
       </div>
 
-      <div className="relative w-full" style={{ height: '400px' }}>
-        <MapContainer
-          center={[pickup.lat, pickup.lon]}
-          zoom={13}
-          className="w-full h-full z-0"
-          scrollWheelZoom={false}
-        >
-          <TileLayer
-            url={tileUrl}
-            attribution='&copy; OpenStreetMap, &copy; CARTO'
-            maxZoom={19}
-          />
+      <div className={`relative w-full overflow-hidden ${theme === 'dark' ? 'bg-teal-950' : 'bg-[#e7f1ee]'}`} style={{ height: '400px' }}>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-label="Local route preview">
+          <defs>
+            <pattern id="map-grid" width="8" height="8" patternUnits="userSpaceOnUse">
+              <path d="M 8 0 L 0 0 0 8" fill="none" stroke={theme === 'dark' ? '#25645f' : '#c9ddd7'} strokeWidth="0.25" />
+            </pattern>
+            <filter id="route-shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0.5" stdDeviation="0.6" floodOpacity="0.25" />
+            </filter>
+          </defs>
+          <rect width="100" height="100" fill="url(#map-grid)" />
+          <path d="M -5 78 C 25 65, 28 34, 58 41 S 84 62, 105 18" fill="none" stroke={theme === 'dark' ? '#1f5d59' : '#bfd4ce'} strokeWidth="7" />
+          <path d="M -5 78 C 25 65, 28 34, 58 41 S 84 62, 105 18" fill="none" stroke={theme === 'dark' ? '#31736d' : '#ffffff'} strokeWidth="5.5" />
+          <path d="M 8 0 C 25 20, 30 58, 48 100" fill="none" stroke={theme === 'dark' ? '#1f5d59' : '#bfd4ce'} strokeWidth="5" />
+          <path d="M 8 0 C 25 20, 30 58, 48 100" fill="none" stroke={theme === 'dark' ? '#2d6b65' : '#ffffff'} strokeWidth="3.5" />
+          <polyline points={routePath} fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3 2" strokeLinecap="round" filter="url(#route-shadow)" />
+        </svg>
 
-          <FitBounds pickup={pickup} delivery={delivery} helperPos={helperPos} />
+        <div className="absolute inset-0">
+          {markerButton('pickup', pickupPosition, 'bg-teal-600', t('volunteer_pickup_from'), <MapPin className="h-5 w-5" fill="white" />)}
+          {markerButton('delivery', deliveryPosition, 'bg-amber-500', t('volunteer_deliver_to'), <Package className="h-5 w-5" fill="white" />)}
+          {markerButton('helper', helperPosition, 'bg-blue-600', helperName, <Truck className="h-5 w-5" />)}
 
-          {/* Pickup marker */}
-          <Marker position={[pickup.lat, pickup.lon]} icon={pickupIcon}>
-            <Popup>
-              <div className="text-sm">
-                <strong>{t('volunteer_pickup_from')}</strong>
-                <br />
-                {pickup.name}
-                <br />
-                <span className="text-teal-600">{pickup.area}</span>
-                {pickup.phone && <br />}
-                {pickup.phone && <span className="text-teal-600">+91 {pickup.phone}</span>}
-              </div>
-            </Popup>
-          </Marker>
-
-          {/* Delivery marker */}
-          <Marker position={[delivery.lat, delivery.lon]} icon={deliveryIcon}>
-            <Popup>
-              <div className="text-sm">
-                <strong>{t('volunteer_deliver_to')}</strong>
-                <br />
-                {delivery.name}
-                <br />
-                <span className="text-teal-600">{delivery.area}</span>
-              </div>
-            </Popup>
-          </Marker>
-
-          {/* OSRM route */}
-          {routeCoords.length > 0 && (
-            <Polyline
-              positions={routeCoords}
-              pathOptions={{ color: '#f59e0b', weight: 4, opacity: 0.8, dashArray: '8,6' }}
-            />
+          {activeMarker === 'pickup' && (
+            <div className="absolute left-4 top-4 max-w-[210px] rounded-xl bg-white/95 dark:bg-teal-900/95 px-3 py-2 text-xs shadow-lg ring-1 ring-teal-100 dark:ring-teal-700">
+              <p className="font-bold text-teal-900 dark:text-teal-50">{t('volunteer_pickup_from')}</p>
+              <p className="text-teal-700 dark:text-teal-200">{pickup.name}</p>
+              <p className="text-teal-500 dark:text-teal-400">{pickup.area}</p>
+              {pickup.phone && <p className="text-teal-500 dark:text-teal-400">+91 {pickup.phone}</p>}
+            </div>
           )}
-
-          {/* Live helper marker */}
-          {helperPos && (
-            <Marker position={helperPos} icon={geoStatus === 'granted' ? helperIconPulse : helperIcon}>
-              <Popup>
-                <div className="text-sm">
-                  <strong>{helperName}</strong>
-                  <br />
-                  <span className="text-blue-600">Live position</span>
-                </div>
-              </Popup>
-            </Marker>
+          {activeMarker === 'delivery' && (
+            <div className="absolute right-4 top-4 max-w-[210px] rounded-xl bg-white/95 dark:bg-teal-900/95 px-3 py-2 text-xs shadow-lg ring-1 ring-amber-100 dark:ring-teal-700">
+              <p className="font-bold text-teal-900 dark:text-teal-50">{t('volunteer_deliver_to')}</p>
+              <p className="text-teal-700 dark:text-teal-200">{delivery.name}</p>
+              <p className="text-teal-500 dark:text-teal-400">{delivery.area}</p>
+            </div>
           )}
-        </MapContainer>
-
-        {routeLoading && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] rounded-full bg-white/90 dark:bg-teal-800/90 px-3 py-1.5 text-xs font-semibold text-teal-700 dark:text-teal-200 shadow-md flex items-center gap-1.5">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching route…
-          </div>
-        )}
-
-        {routeError && !routeLoading && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] rounded-full bg-amber-100 dark:bg-amber-900/40 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300 shadow-md">
-            Route unavailable — showing straight line
-          </div>
-        )}
+          {activeMarker === 'helper' && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-xl bg-white/95 dark:bg-teal-900/95 px-3 py-2 text-xs shadow-lg ring-1 ring-blue-100 dark:ring-teal-700">
+              <p className="font-bold text-teal-900 dark:text-teal-50">{helperName}</p>
+              <p className="text-blue-600 dark:text-blue-300">Local helper position</p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 border-t border-cream-200 dark:border-teal-800">
         <div className="px-4 py-3 border-r border-cream-200 dark:border-teal-800">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-teal-600" />
-            <span className="text-[10px] font-bold uppercase tracking-wide text-teal-500 dark:text-teal-400">{t('volunteer_pickup_from')}</span>
-          </div>
+          <div className="flex items-center gap-2 mb-0.5"><span className="flex h-2.5 w-2.5 rounded-full bg-teal-600" /><span className="text-[10px] font-bold uppercase tracking-wide text-teal-500 dark:text-teal-400">{t('volunteer_pickup_from')}</span></div>
           <p className="text-sm font-semibold text-teal-900 dark:text-teal-50">{pickup.name}</p>
           <p className="text-xs text-teal-500 dark:text-teal-400">{pickup.area}</p>
         </div>
         <div className="px-4 py-3">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500" />
-            <span className="text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">{t('volunteer_deliver_to')}</span>
-          </div>
+          <div className="flex items-center gap-2 mb-0.5"><span className="flex h-2.5 w-2.5 rounded-full bg-amber-500" /><span className="text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">{t('volunteer_deliver_to')}</span></div>
           <p className="text-sm font-semibold text-teal-900 dark:text-teal-50">{delivery.name}</p>
           <p className="text-xs text-teal-500 dark:text-teal-400">{delivery.area}</p>
         </div>

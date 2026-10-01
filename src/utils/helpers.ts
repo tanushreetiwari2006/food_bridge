@@ -24,7 +24,7 @@ export function getUrgencyLevel(safeTill: string): 'safe' | 'warning' | 'critica
   return 'safe';
 }
 
-export function foodTypeLabel(type: FoodType): string {
+function foodTypeLabel(type: FoodType): string {
   switch (type) {
     case 'veg': return 'food_veg';
     case 'non-veg': return 'food_nonveg';
@@ -44,7 +44,7 @@ export function foodTypeColor(type: FoodType): string {
   }
 }
 
-export function statusLabelKey(status: ListingStatus): string {
+function statusLabelKey(status: ListingStatus): string {
   switch (status) {
     case 'forecast': return 'status_forecast';
     case 'ready': return 'status_ready';
@@ -113,14 +113,4 @@ export function getBestMatches(listing: Listing, ngos: NGO[]): NGO[] {
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
     .map((x) => x.ngo);
-}
-
-export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
 }

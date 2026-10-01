@@ -1,5 +1,4 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
-@import 'leaflet/dist/leaflet.css';
 
 @tailwind base;
 @tailwind components;
@@ -51,30 +50,6 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-}
-
-/* Leaflet marker pulse animation */
-@keyframes pulse-ring {
-  0% { transform: scale(0.8); opacity: 0.5; }
-  100% { transform: scale(2); opacity: 0; }
-}
-
-.leaflet-container {
-  font-family: inherit;
-  background: #e8eef0;
-}
-.dark .leaflet-container {
-  background: #134e4a;
-}
-.leaflet-popup-content-wrapper {
-  border-radius: 12px;
-}
-.dark .leaflet-popup-content-wrapper {
-  background: #134e4a;
-  color: #f0fdfa;
-}
-.dark .leaflet-popup-tip {
-  background: #134e4a;
 }
 
 /* Custom scrollbar */

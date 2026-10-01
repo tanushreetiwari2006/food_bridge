@@ -151,9 +151,7 @@ export default function VolunteerPage() {
                     lon: 77.5048,
                     phone: task.claimedByNgoPhone,
                   }}
-                  helperId={user?.phone || 'helper-demo'}
                   helperName={myHelperRecord?.name || user?.name || 'Volunteer'}
-                  taskId={task.id}
                 />
               </div>
 

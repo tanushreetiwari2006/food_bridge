@@ -84,17 +84,6 @@ export interface Listing {
   matchedNgoIds?: string[];
 }
 
-export interface DailyNeed {
-  id: string;
-  ngoId: string;
-  ngoName: string;
-  peopleCount: number;
-  foodType: FoodType;
-  pickupWindow: string;
-  area: string;
-  date: string;
-}
-
 export interface ImpactStats {
   mealsRescued: number;
   liveListings: number;
