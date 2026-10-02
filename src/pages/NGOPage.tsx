@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Users, Clock, MapPin, KeyRound, ShieldCheck, AlertTriangle, CheckCircle2, Package, TrendingUp, Phone, UserPlus, Trash2 } from 'lucide-react';
 import type { FoodType, Listing } from '@/types';
-import { mockNGOs, mockListings } from '@/data/mockData';
+import { mockNGOs } from '@/data/mockData';
 import { foodTypeLabelT, foodTypeColor, statusLabelT, statusColor } from '@/utils/helpers';
 import { useLang } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';

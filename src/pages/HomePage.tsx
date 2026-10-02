@@ -1,4 +1,4 @@
-import { UtensilsCrossed, ShieldCheck, Truck, KeyRound, ArrowRight, Heart, Sparkles, Clock, Users, LogIn } from 'lucide-react';
+import { UtensilsCrossed, ShieldCheck, KeyRound, ArrowRight, Heart, Sparkles, Clock, Users, LogIn } from 'lucide-react';
 import { useNav } from '@/context/NavContext';
 import { useLang } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
